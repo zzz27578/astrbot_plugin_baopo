@@ -1,0 +1,88 @@
+{
+  "enable_cutover": {
+    "type": "bool",
+    "description": "启用爆破功能",
+    "default": true,
+    "hint": "关闭后 /sl 和工具调用都会停止执行。"
+  },
+  "enable_llm_tool": {
+    "type": "bool",
+    "description": "启用爆破工具",
+    "default": true,
+    "hint": "开启后 bot 可以在确认语境下调用 perform_memory_transfer。"
+  },
+  "require_explicit_confirmation": {
+    "type": "bool",
+    "description": "工具调用需要明确确认",
+    "default": true,
+    "hint": "推荐开启。模糊语境下工具会要求 bot 先追问确认。"
+  },
+  "use_current_provider_for_summary": {
+    "type": "bool",
+    "description": "使用当前模型总结上下文",
+    "default": true,
+    "hint": "开启后爆破前会调用当前会话正在使用的模型生成前情提要。"
+  },
+  "fallback_summary_provider_id": {
+    "type": "string",
+    "description": "备用总结模型",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "当前模型总结失败时使用；不选择则不启用备用模型。"
+  },
+  "enable_tool_policy_prompt": {
+    "type": "bool",
+    "description": "注入爆破使用规范",
+    "default": true,
+    "hint": "隐藏注入给 bot 的规范，不会作为用户消息显示。"
+  },
+  "tool_policy_prompt": {
+    "type": "text",
+    "description": "爆破工具调用规范",
+    "default": "你拥有一个名为 perform_memory_transfer 的工具，用于“爆破 / 换房 / 重置上下文但保留前情”。\n\n使用原则：\n1. 只有当用户明确要求“爆破”“直接重置”“reset”“换房”“重置下自己”等语义时，才可以调用该工具。\n2. 如果用户只是抱怨上下文乱、模型卡住、想清理一下，但没有明确说要立刻执行，先用自然语言追问确认。\n3. 不要因为“话题结束”“任务完成”“该翻篇了”等主观判断自动调用。\n4. 调用工具时必须给 diary_summary 写入前情提要，说明当前任务、重要事实、用户偏好、未完成事项和接续语气。\n5. 如果用户说“不要爆破”“别重置”“先不 reset”，绝对不要调用。\n6. 工具别名包括：爆破、换房、重置下自己、清理上下文并继续、睡大觉后接着聊。",
+    "hint": "建议写成规则，不要写成聊天口吻。"
+  },
+  "install_context_cutover_skill": {
+    "type": "bool",
+    "description": "安装爆破 skills",
+    "default": true,
+    "hint": "开启后会把随插件提供的 context-cutover skill 安装并启用。"
+  },
+  "delete_old_conversation": {
+    "type": "bool",
+    "description": "爆破后删除旧会话",
+    "default": true,
+    "hint": "开启后才是真正清理上下文；关闭则只创建新会话并保留旧分支。"
+  },
+  "enable_scheduled_cutover": {
+    "type": "bool",
+    "description": "启用定时爆破",
+    "default": false,
+    "hint": "需要先在目标窗口发送 /sl bind 绑定会话。更推荐由 bot 创建定时任务自主调用工具。"
+  },
+  "scheduled_time": {
+    "type": "string",
+    "description": "定时爆破时间",
+    "default": "03:00",
+    "hint": "填写 HH:MM，例如 03:00；也可以填写 5 段 cron。"
+  },
+  "scheduled_timezone": {
+    "type": "string",
+    "description": "定时时区",
+    "default": "Asia/Shanghai",
+    "hint": "默认使用北京时间。"
+  },
+  "scheduled_session": {
+    "type": "string",
+    "description": "定时爆破会话",
+    "default": "",
+    "hint": "在目标窗口发送 /sl bind 自动填写，不建议手动改。"
+  },
+  "scheduled_note": {
+    "type": "text",
+    "description": "定时唤醒提示",
+    "default": "这是定时爆破任务。请先根据需要写入小窝日记，然后直接调用 perform_memory_transfer 完成爆破换房。",
+    "hint": "会作为定时任务唤醒 bot 的提示。"
+  }
+}
+
