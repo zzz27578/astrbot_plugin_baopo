@@ -1,5 +1,11 @@
 # 更新日志
 
+## v0.1.2
+
+- 对照 AstrBot 最新 `de572e3` 工具调用链，收窄并优化消息事件兼容解析逻辑。
+- 优先支持官方新版 `ContextWrapper.context.event` 路径，同时保留旧版 `AstrMessageEvent` 直传兼容。
+- 保留少量旧壳子字段兼容，避免递归扫描任意对象属性导致误判。
+
 ## v0.1.1
 
 - 修复 AstrBot 新版工具调用传入 `ContextWrapper` 后，爆破工具无法读取真实消息事件的问题。

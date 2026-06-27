@@ -15,7 +15,7 @@ from astrbot.api.star import Context, Star, register
 
 
 PLUGIN_NAME = "astrbot_plugin_bao_po"
-PLUGIN_VERSION = "v0.1.1"
+PLUGIN_VERSION = "v0.1.2"
 PLUGIN_AUTHOR = "百岁老太"
 PLUGIN_DESC = "爆破：自我总结上下文并换房清理当前对话。"
 SKILL_NAME = "context-cutover"
@@ -150,7 +150,9 @@ def _safe_getattr(value: Any, name: str) -> Any:
         return None
 
 
-def _looks_like_message_event(value: Any) -> bool:
+def _is_message_event(value: Any) -> bool:
+    if isinstance(value, AstrMessageEvent):
+        return True
     return (
         value is not None
         and callable(_safe_getattr(value, "get_message_str"))
@@ -160,34 +162,37 @@ def _looks_like_message_event(value: Any) -> bool:
     )
 
 
-def _unwrap_message_event(value: Any) -> AstrMessageEvent | None:
-    seen: set[int] = set()
-
-    def visit(current: Any, depth: int) -> AstrMessageEvent | None:
-        if current is None or depth > 8:
+def _follow_attr_path(value: Any, path: tuple[str, ...]) -> Any:
+    current = value
+    for attr_name in path:
+        current = _safe_getattr(current, attr_name)
+        if current is None:
             return None
-        obj_id = id(current)
-        if obj_id in seen:
-            return None
-        seen.add(obj_id)
+    return current
 
-        if _looks_like_message_event(current):
-            return current
 
-        for attr_name in (
-            "event",
-            "_event",
-            "message_event",
-            "astr_event",
-            "source_event",
-            "context",
-        ):
-            found = visit(_safe_getattr(current, attr_name), depth + 1)
-            if found is not None:
-                return found
-        return None
+def _as_message_event(value: Any) -> AstrMessageEvent | None:
+    if _is_message_event(value):
+        return value
+    return None
 
-    return visit(value, 0)
+
+def _resolve_message_event(value: Any) -> AstrMessageEvent | None:
+    # Official AstrBot paths first, then narrow fallbacks for older wrapper shapes.
+    for path in (
+        (),
+        ("context", "event"),
+        ("event",),
+        ("_event",),
+        ("message_event",),
+        ("astr_event",),
+        ("source_event",),
+        ("context",),
+    ):
+        event = _as_message_event(_follow_attr_path(value, path))
+        if event is not None:
+            return event
+    return None
 
 
 @register(PLUGIN_NAME, PLUGIN_AUTHOR, PLUGIN_DESC, PLUGIN_VERSION)
@@ -283,14 +288,15 @@ class BaoPoPlugin(Star):
         user_confirmed: bool = False,
         source: str = "tool",
     ) -> str:
-        message_event = _unwrap_message_event(event)
+        if not _bool_config(self.config, "enable_cutover", True):
+            return "爆破功能当前未启用。"
+
+        message_event = _resolve_message_event(event)
         if message_event is None:
             logger.warning(f"[爆破] 未能从工具调用上下文中取得 AstrBot 消息事件: {type(event).__name__}")
             return "爆破失败：未能从工具调用上下文中取得 AstrBot 消息事件，请检查 AstrBot 版本或更新插件。"
         event = message_event
 
-        if not _bool_config(self.config, "enable_cutover", True):
-            return "爆破功能当前未启用。"
         if source == "tool" and _bool_config(self.config, "require_explicit_confirmation", True):
             if not user_confirmed and not _is_explicit_cutover_request(event.get_message_str()):
                 return "爆破需要用户明确确认。请先询问用户是否现在执行爆破。"
