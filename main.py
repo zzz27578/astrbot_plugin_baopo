@@ -15,7 +15,7 @@ from astrbot.api.star import Context, Star, register
 
 
 PLUGIN_NAME = "astrbot_plugin_bao_po"
-PLUGIN_VERSION = "v0.1.0"
+PLUGIN_VERSION = "v0.1.1"
 PLUGIN_AUTHOR = "百岁老太"
 PLUGIN_DESC = "爆破：自我总结上下文并换房清理当前对话。"
 SKILL_NAME = "context-cutover"
@@ -143,6 +143,53 @@ def _parse_time_to_cron(value: str) -> str:
     return f"{minute} {hour} * * *"
 
 
+def _safe_getattr(value: Any, name: str) -> Any:
+    try:
+        return getattr(value, name)
+    except Exception:
+        return None
+
+
+def _looks_like_message_event(value: Any) -> bool:
+    return (
+        value is not None
+        and callable(_safe_getattr(value, "get_message_str"))
+        and _safe_getattr(value, "unified_msg_origin") is not None
+        and callable(_safe_getattr(value, "get_platform_id"))
+        and callable(_safe_getattr(value, "set_extra"))
+    )
+
+
+def _unwrap_message_event(value: Any) -> AstrMessageEvent | None:
+    seen: set[int] = set()
+
+    def visit(current: Any, depth: int) -> AstrMessageEvent | None:
+        if current is None or depth > 8:
+            return None
+        obj_id = id(current)
+        if obj_id in seen:
+            return None
+        seen.add(obj_id)
+
+        if _looks_like_message_event(current):
+            return current
+
+        for attr_name in (
+            "event",
+            "_event",
+            "message_event",
+            "astr_event",
+            "source_event",
+            "context",
+        ):
+            found = visit(_safe_getattr(current, attr_name), depth + 1)
+            if found is not None:
+                return found
+        return None
+
+    return visit(value, 0)
+
+
 @register(PLUGIN_NAME, PLUGIN_AUTHOR, PLUGIN_DESC, PLUGIN_VERSION)
 class BaoPoPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
@@ -193,8 +240,8 @@ class BaoPoPlugin(Star):
     @filter.llm_tool(name="perform_memory_transfer")
     async def perform_memory_transfer(
         self,
-        event: AstrMessageEvent,
-        diary_summary: str,
+        event: Any = None,
+        diary_summary: str = "",
         user_confirmed: bool = False,
     ):
         """执行物理级重置与记忆转移。调用此工具会开辟新会话、注入前情提要，并清理旧上下文。只有用户明确要求爆破、换房、reset 或重置上下文时才可调用；模糊场景必须先追问确认。
@@ -231,11 +278,17 @@ class BaoPoPlugin(Star):
     async def _perform_memory_transfer(
         self,
         *,
-        event: AstrMessageEvent,
+        event: Any,
         diary_summary: str = "",
         user_confirmed: bool = False,
         source: str = "tool",
     ) -> str:
+        message_event = _unwrap_message_event(event)
+        if message_event is None:
+            logger.warning(f"[爆破] 未能从工具调用上下文中取得 AstrBot 消息事件: {type(event).__name__}")
+            return "爆破失败：未能从工具调用上下文中取得 AstrBot 消息事件，请检查 AstrBot 版本或更新插件。"
+        event = message_event
+
         if not _bool_config(self.config, "enable_cutover", True):
             return "爆破功能当前未启用。"
         if source == "tool" and _bool_config(self.config, "require_explicit_confirmation", True):

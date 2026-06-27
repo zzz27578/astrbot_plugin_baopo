@@ -2,7 +2,7 @@ name: astrbot_plugin_bao_po
 display_name: 爆破
 desc: 自我总结上下文并换房清理当前对话的 AstrBot 插件。
 short_desc: 上下文爆破、换房、重置接续。
-version: v0.1.0
+version: v0.1.1
 author: 百岁老太
 repo: https://github.com/zzz27578/astrbot_plugin_baopo
 astrbot_version: ">=4.16,<5"
